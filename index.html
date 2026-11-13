@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Игра: Сортировка по ударным слогам</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', sans-serif;
+            overflow-x: hidden;
+            background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 50%, #E0FFFF 100%);
+            min-height: 100vh;
+            position: relative;
+            user-select: none;
+        }
+
+        .bg-scene {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .snowflake {
+            position: fixed;
+            top: -10px;
+            color: #fff;
+            font-size: 1.2em;
+            text-shadow: 0 0 5px rgba(255,255,255,0.8);
+            animation: fall linear infinite;
+            z-index: 1;
+            pointer-events: none;
+        }
+        @keyframes fall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(105vh) rotate(360deg); opacity: 0.3; }
+        }
+
+        .character {
+            position: fixed;
+            bottom: 0;
+            left: 20px;
+            width: 160px;
+            height: 250px;
+            z-index: 2;
+            pointer-events: none;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2));
+        }
+
+        .game-card {
+            position: relative;
+            z-index: 10;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 25px 30px;
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(8px);
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            font-size: 2rem;
+            margin: 0 0 10px 0;
+        }
+
+        .instructions {
+            text-align: center;
+            color: #34495e;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .bins-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .bin {
+            flex: 1;
+            min-width: 200px;
+            min-height: 150px;
+            background: rgba(255, 255, 255, 0.7);
+            border: 3px dashed #3498db;
+            border-radius: 16px;
+            padding: 12px;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .bin.bin-1 { border-color: #e74c3c; background: rgba(231, 76, 60, 0.12); }
+        .bin.bin-2 { border-color: #f39c12; background: rgba(243, 156, 18, 0.12); }
+        .bin.bin-3 { border-color: #27ae60; background: rgba(39, 174, 96, 0.12); }
+        .bin.bin-4 { border-color: #9b59b6; background: rgba(155, 89, 182, 0.12); }
+
+        .bin.drag-over {
+            transform: scale(1.03);
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        .bin-title {
+            font-size: 1.15rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .bin-words {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+            min-height: 50px;
+            width: 100%;
+        }
+
+        .words-pool {
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 16px;
+            padding: 15px;
+            min-height: 100px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            border: 2px solid #bdc3c7;
+        }
+
+        .word-card {
+            background: #fff;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 1.15rem;
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: grab;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+            border: 2px solid #3498db;
+            transition: transform 0.15s, box-shadow 0.15s;
+            touch-action: none;
+        }
+
+        .word-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+        }
+
+        .word-card.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .word-card.ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+            transform: scale(1.1);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .word-card.correct {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .word-card.incorrect {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        .btn-container {
+            text-align: center;
+            margin-top: 20px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-size: 1.2rem;
+            padding: 12px 28px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            transition: transform 0.1s, background 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        }
+        button:active { transform: scale(0.95); }
+
+        #check-btn { background: #27ae60; color: white; }
+        #check-btn:hover { background: #2ecc71; }
+        #restart-btn { background: #2980b9; color: white; display: none; }
+        #restart-btn:hover { background: #3498db; }
+
+        #result-container {
+            text-align: center;
+            margin-top: 18px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #2c3e50;
+            min-height: 30px;
+        }
+
+        @media (max-width: 900px) {
+            .bin { min-width: calc(50% - 10px); }
+        }
+
+        @media (max-width: 600px) {
+            .game-card { margin: 15px 10px; padding: 18px; }
+            h1 { font-size: 1.5rem; }
+            .character { width: 110px; height: 170px; opacity: 0.7; }
+            .bin { min-width: 100%; }
+            .word-card { font-size: 1rem; padding: 6px 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Фоновая сцена -->
+    <svg class="bg-scene" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid slice">
+        <defs>
+            <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#74b9ff"/>
+                <stop offset="100%" stop-color="#dfe6e9"/>
+            </linearGradient>
+        </defs>
+        <rect width="1000" height="800" fill="url(#skyGrad)"/>
+        
+        <g fill="#636e72" opacity="0.4">
+            <rect x="50" y="300" width="80" height="500"/>
+            <rect x="150" y="220" width="100" height="580"/>
+            <rect x="270" y="350" width="70" height="450"/>
+            <rect x="360" y="180" width="120" height="620"/>
+            <rect x="500" y="280" width="90" height="520"/>
+            <rect x="610" y="150" width="110" height="650"/>
+            <rect x="740" y="320" width="80" height="480"/>
+            <rect x="840" y="200" width="100" height="600"/>
+        </g>
+        <g fill="#fdcb6e" opacity="0.7">
+            <rect x="170" y="250" width="15" height="20"/><rect x="210" y="250" width="15" height="20"/>
+            <rect x="170" y="300" width="15" height="20"/><rect x="210" y="300" width="15" height="20"/>
+            <rect x="380" y="220" width="15" height="20"/><rect x="420" y="220" width="15" height="20"/>
+            <rect x="380" y="280" width="15" height="20"/><rect x="420" y="280" width="15" height="20"/>
+            <rect x="630" y="180" width="15" height="20"/><rect x="670" y="180" width="15" height="20"/>
+            <rect x="630" y="240" width="15" height="20"/><rect x="670" y="240" width="15" height="20"/>
+            <rect x="860" y="250" width="15" height="20"/><rect x="900" y="250" width="15" height="20"/>
+        </g>
+
+        <path d="M0,550 Q250,500 500,560 T1000,530 L1000,800 L0,800 Z" fill="#ffffff"/>
+        <path d="M0,620 Q300,580 600,630 T1000,600 L1000,800 L0,800 Z" fill="#f1f2f6"/>
+
+        <g>
+            <polygon points="100,600 160,420 220,600" fill="#2d5a27"/>
+            <path d="M160,420 L125,500 Q160,480 195,500 Z" fill="#ffffff"/>
+            <polygon points="780,620 850,400 920,620" fill="#2d5a27"/>
+            <path d="M850,400 L805,500 Q850,480 895,500 Z" fill="#ffffff"/>
+            <polygon points="40,680 90,520 140,680" fill="#3a7033"/>
+            <path d="M90,520 L65,590 Q90,570 115,590 Z" fill="#ffffff"/>
+            <polygon points="880,680 930,540 980,680" fill="#3a7033"/>
+            <path d="M930,540 L905,610 Q930,590 955,610 Z" fill="#ffffff"/>
+        </g>
+    </svg>
+
+    <div class="snowflake" style="left: 10%; animation-duration: 4s;">❄</div>
+    <div class="snowflake" style="left: 25%; animation-duration: 6s; animation-delay: 2s;">❄</div>
+    <div class="snowflake" style="left: 40%; animation-duration: 5s; animation-delay: 1s;">❄</div>
+    <div class="snowflake" style="left: 55%; animation-duration: 7s; animation-delay: 3s;">❄</div>
+    <div class="snowflake" style="left: 70%; animation-duration: 4.5s; animation-delay: 0.5s;">❄</div>
+    <div class="snowflake" style="left: 85%; animation-duration: 5.5s; animation-delay: 2.5s;">❄</div>
+    <div class="snowflake" style="left: 95%; animation-duration: 6.5s; animation-delay: 1.5s;">❄</div>
+
+    <!-- Медвежонок в полный рост без глаз и рта -->
+    <svg class="character" viewBox="0 0 200 300">
+        <ellipse cx="100" cy="290" rx="60" ry="10" fill="rgba(0,0,0,0.15)"/>
+        <ellipse cx="70" cy="260" rx="22" ry="30" fill="#8B4513"/>
+        <ellipse cx="130" cy="260" rx="22" ry="30" fill="#8B4513"/>
+        <ellipse cx="100" cy="190" rx="65" ry="85" fill="#8B4513"/>
+        <ellipse cx="35" cy="170" rx="18" ry="45" fill="#8B4513" transform="rotate(25 35 170)"/>
+        <ellipse cx="165" cy="170" rx="18" ry="45" fill="#8B4513" transform="rotate(-25 165 170)"/>
+        <circle cx="100" cy="90" r="55" fill="#8B4513"/>
+        <circle cx="55" cy="50" r="18" fill="#8B4513"/>
+        <circle cx="145" cy="50" r="18" fill="#8B4513"/>
+        <path d="M45,75 Q100,10 155,75 Z" fill="#d32f2f"/>
+        <circle cx="100" cy="20" r="16" fill="#ffffff"/>
+        <rect x="40" y="70" width="120" height="15" rx="7" fill="#b71c1c"/>
+        <path d="M55,130 Q100,155 145,130 L135,165 Q100,185 65,165 Z" fill="#1976d2"/>
+        <rect x="115" y="145" width="22" height="65" rx="11" fill="#1976d2"/>
+        <rect x="115" y="160" width="22" height="6" fill="#64b5f6"/>
+        <rect x="115" y="180" width="22" height="6" fill="#64b5f6"/>
+    </svg>
+
+    <!-- Игровая карточка -->
+    <div class="game-card">
+        <h1>🌨️ Сортировка по ударным слогам 🌨️</h1>
+        <p class="instructions">Перетащи каждое слово в нужный прямоугольник: <b style="color:#e74c3c">1-й</b>, <b style="color:#f39c12">2-й</b>, <b style="color:#27ae60">3-й</b> или <b style="color:#9b59b6">4-й</b> ударный слог.</p>
+
+        <div class="bins-container">
+            <div class="bin bin-1" data-bin="1">
+                <div class="bin-title">🔴 1-й ударный слог</div>
+                <div class="bin-words"></div>
+            </div>
+            <div class="bin bin-2" data-bin="2">
+                <div class="bin-title">🟠 2-й ударный слог</div>
+                <div class="bin-words"></div>
+            </div>
+            <div class="bin bin-3" data-bin="3">
+                <div class="bin-title">🟢 3-й ударный слог</div>
+                <div class="bin-words"></div>
+            </div>
+            <div class="bin bin-4" data-bin="4">
+                <div class="bin-title">🟣 4-й ударный слог</div>
+                <div class="bin-words"></div>
+            </div>
+        </div>
+
+        <div class="words-pool" id="words-pool"></div>
+
+        <div class="btn-container">
+            <button id="check-btn">Проверить</button>
+            <button id="restart-btn">Начать заново</button>
+        </div>
+
+        <div id="result-container"></div>
+    </div>
+
+    <script>
+        // Все слова строго по документу пользователя
+        const allWords = [
+            // ===== 1-й ударный слог =====
+            { word: "изредка", stress: 1 },
+            { word: "жаворонок", stress: 1 },
+            { word: "понял", stress: 1 },
+            { word: "взяли", stress: 1 },
+            { word: "поняли", stress: 1 },
+            { word: "ожил", stress: 1 },
+            { word: "средства", stress: 1 },
+            { word: "центнер", stress: 1 },
+            { word: "хвоя", stress: 1 },
+            { word: "искра", stress: 1 },
+            { word: "торты", stress: 1 },
+            { word: "ненависть", stress: 1 },
+            { word: "краны", stress: 1 },
+            { word: "банты", stress: 1 },
+            { word: "кухонный", stress: 1 },
+            { word: "туфля", stress: 1 },
+            { word: "доверху", stress: 1 },
+            { word: "статуя", stress: 1 },
+            { word: "принял", stress: 1 },
+            { word: "августовский", stress: 1 },
+            { word: "бухгалтеры", stress: 1 },
+            { word: "сливовый", stress: 1 },
+            { word: "шарфы", stress: 1 },
+
+            // ===== 2-й ударный слог =====
+            { word: "брала", stress: 2 },
+            { word: "включит", stress: 2 },
+            { word: "арбуз", stress: 2 },
+            { word: "досуг", stress: 2 },
+            { word: "квартал", stress: 2 },
+            { word: "звала", stress: 2 },
+            { word: "цемент", stress: 2 },
+            { word: "портфель", stress: 2 },
+            { word: "звонит", stress: 2 },
+            { word: "шкафы", stress: 2 },
+            { word: "столяр", stress: 2 },
+            { word: "звонишь", stress: 2 },
+            { word: "шофёр", stress: 2 },
+            { word: "положит", stress: 2 },
+            { word: "звоним", stress: 2 },
+            { word: "задаст", stress: 2 },
+            { word: "начать", stress: 2 },
+            { word: "красивее", stress: 2 },
+            { word: "ходатайствовать", stress: 2 },
+            { word: "крапива", stress: 2 },
+            { word: "процент", stress: 2 },
+            { word: "завидно", stress: 2 },
+            { word: "ремень", stress: 2 },
+            { word: "оптовый", stress: 2 },
+            { word: "взяла", stress: 2 },
+            { word: "донельзя", stress: 2 },
+            { word: "звонят", stress: 2 },
+            { word: "щавель", stress: 2 },
+            { word: "начался", stress: 2 },
+            { word: "добыча", stress: 2 },
+            { word: "медведями", stress: 2 },
+
+            // ===== 3-й ударный слог =====
+            { word: "алфавит", stress: 3 },
+            { word: "занята", stress: 3 },
+            { word: "километр", stress: 3 },
+            { word: "поняла", stress: 3 },
+            { word: "ожила", stress: 3 },
+            { word: "ворота", stress: 3 },
+            { word: "сантиметр", stress: 3 },
+            { word: "повторит", stress: 3 },
+            { word: "положил", stress: 3 },
+            { word: "начала", stress: 3 },
+            { word: "кладовая", stress: 3 },
+            { word: "самовар", stress: 3 },
+            { word: "позвонят", stress: 3 },
+            { word: "магазин", stress: 3 },
+            { word: "инструмент", stress: 3 },
+            { word: "повторим", stress: 3 },
+            { word: "углубить", stress: 3 },
+            { word: "жалюзи", stress: 3 },
+            { word: "попила", stress: 3 },
+            { word: "договор", stress: 3 },
+            { word: "каталог", stress: 3 },
+            { word: "документ", stress: 3 },
+            { word: "перезвонит", stress: 3 },
+            { word: "глубоко", stress: 3 },
+            { word: "проспала", stress: 3 },
+            { word: "кулинария", stress: 3 },
+
+            // ===== 4-й ударный слог =====
+            { word: "нефтепровод", stress: 4 },
+            { word: "газопровод", stress: 4 },
+            { word: "трубопровод", stress: 4 },
+            { word: "избаловать", stress: 4 },
+            { word: "премировать", stress: 4 }
+        ];
+
+        const pool = document.getElementById('words-pool');
+        const bins = document.querySelectorAll('.bin');
+        const checkBtn = document.getElementById('check-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const resultContainer = document.getElementById('result-container');
+
+        let currentWords = [];
+        let draggedCard = null;
+        let ghostCard = null;
+        let offsetX = 0, offsetY = 0;
+
+        function shuffle(arr) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function createCard(item) {
+            const card = document.createElement('div');
+            card.className = 'word-card';
+            card.textContent = item.word;
+            card.dataset.word = item.word;
+            card.dataset.stress = item.stress;
+            card.draggable = true;
+
+            card.addEventListener('dragstart', (e) => {
+                draggedCard = card;
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+                draggedCard = null;
+            });
+
+            card.addEventListener('touchstart', handleTouchStart, { passive: false });
+            card.addEventListener('touchmove', handleTouchMove, { passive: false });
+            card.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+            return card;
+        }
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            draggedCard = e.currentTarget;
+            const rect = draggedCard.getBoundingClientRect();
+            offsetX = touch.clientX - rect.left;
+            offsetY = touch.clientY - rect.top;
+
+            ghostCard = draggedCard.cloneNode(true);
+            ghostCard.classList.add('ghost');
+            ghostCard.style.width = rect.width + 'px';
+            ghostCard.style.left = (touch.clientX - offsetX) + 'px';
+            ghostCard.style.top = (touch.clientY - offsetY) + 'px';
+            document.body.appendChild(ghostCard);
+
+            draggedCard.classList.add('dragging');
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (!ghostCard) return;
+            const touch = e.touches[0];
+            ghostCard.style.left = (touch.clientX - offsetX) + 'px';
+            ghostCard.style.top = (touch.clientY - offsetY) + 'px';
+
+            bins.forEach(b => b.classList.remove('drag-over'));
+            const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (elemBelow) {
+                const bin = elemBelow.closest('.bin');
+                if (bin) bin.classList.add('drag-over');
+            }
+        }
+
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            if (!ghostCard || !draggedCard) return;
+            const touch = e.changedTouches[0];
+            const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+
+            bins.forEach(b => b.classList.remove('drag-over'));
+
+            if (elemBelow) {
+                const bin = elemBelow.closest('.bin');
+                if (bin) {
+                    bin.querySelector('.bin-words').appendChild(draggedCard);
+                } else if (elemBelow.closest('.words-pool') || elemBelow.closest('.game-card')) {
+                    pool.appendChild(draggedCard);
+                }
+            }
+
+            ghostCard.remove();
+            ghostCard = null;
+            draggedCard.classList.remove('dragging');
+            draggedCard = null;
+        }
+
+        bins.forEach(bin => {
+            bin.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                bin.classList.add('drag-over');
+            });
+            bin.addEventListener('dragleave', () => {
+                bin.classList.remove('drag-over');
+            });
+            bin.addEventListener('drop', (e) => {
+                e.preventDefault();
+                bin.classList.remove('drag-over');
+                if (draggedCard) {
+                    bin.querySelector('.bin-words').appendChild(draggedCard);
+                }
+            });
+        });
+
+        pool.addEventListener('dragover', (e) => e.preventDefault());
+        pool.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (draggedCard) pool.appendChild(draggedCard);
+        });
+
+        function generateGame() {
+            pool.innerHTML = '';
+            bins.forEach(b => b.querySelector('.bin-words').innerHTML = '');
+            resultContainer.innerHTML = '';
+            checkBtn.style.display = 'inline-block';
+            restartBtn.style.display = 'none';
+
+            const byStress = { 1: [], 2: [], 3: [], 4: [] };
+            allWords.forEach(w => byStress[w.stress].push(w));
+
+            // По 4 слова из каждой категории = 16 слов
+            currentWords = [
+                ...shuffle(byStress[1]).slice(0, 4),
+                ...shuffle(byStress[2]).slice(0, 4),
+                ...shuffle(byStress[3]).slice(0, 4),
+                ...shuffle(byStress[4]).slice(0, 4)
+            ];
+            currentWords = shuffle(currentWords);
+
+            currentWords.forEach(item => {
+                pool.appendChild(createCard(item));
+            });
+        }
+
+        checkBtn.addEventListener('click', () => {
+            let correct = 0;
+            let total = 0;
+
+            document.querySelectorAll('.word-card').forEach(card => {
+                total++;
+                const parent = card.parentElement.closest('.bin');
+                const expectedStress = parseInt(card.dataset.stress);
+                let placedBin = null;
+                if (parent) {
+                    placedBin = parseInt(parent.dataset.bin);
+                }
+
+                if (placedBin === expectedStress) {
+                    correct++;
+                    card.classList.add('correct');
+                } else {
+                    card.classList.add('incorrect');
+                    setTimeout(() => {
+                        card.classList.remove('incorrect', 'correct');
+                        pool.appendChild(card);
+                    }, 1800);
+                }
+            });
+
+            let message = "";
+            if (correct === total) {
+                message = `🎉 Великолепно! Все ${correct} из ${total} слов разложены верно!`;
+            } else if (correct >= total * 0.8) {
+                message = `👍 Отлично! ${correct} из ${total} правильно. Ошибки вернулись в общий список.`;
+            } else if (correct >= total * 0.5) {
+                message = `🤔 Неплохо! ${correct} из ${total}. Попробуй ещё раз!`;
+            } else {
+                message = `💪 ${correct} из ${total}. Потренируйся ещё — у тебя получится!`;
+            }
+
+            resultContainer.innerHTML = `<h2>${message}</h2>`;
+            checkBtn.style.display = 'none';
+            restartBtn.style.display = 'inline-block';
+        });
+
+        restartBtn.addEventListener('click', generateGame);
+
+        generateGame();
+    </script>
+</body>
+</html>
